@@ -1,49 +1,35 @@
 use clap::Parser;
-use reqwest::blocking::Client;
-use std::fs::File;
-use std::io::{copy, stdout};
-use std::process::exit;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 mod cli;
+mod download;
+
 use cli::Args;
+use download::download;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
-    // Create HTTP client
-    let client = Client::new();
-    let response = client.get(&args.url).send()?;
+    // Load URLs from file if provided
+    if let Some(ref input_path) = args.input {
+        let file = File::open(input_path)?;
+        let reader = BufReader::new(file);
+        let file_urls = reader
+            .lines()
+            .filter_map(Result::ok)
+            .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
+            .collect::<Vec<String>>();
 
-    // Print HTTP status
-    let status = response.status();
-    println!("Status: {}", status);
-
-    // Print headers
-    println!("Headers:");
-    for (key, value) in response.headers() {
-        println!("  {}: {}", key, value.to_str().unwrap_or("[binary]"));
+        args.urls.extend(file_urls);
     }
 
-    if !status.is_success() {
-        eprintln!("Download failed with status code: {}", status);
-        exit(1);
+    if args.urls.is_empty() {
+        eprintln!("Error: No URLs provided (use positional or --input)");
+        std::process::exit(1);
     }
 
-    // Write response body
-    let body = response.bytes()?;
-    let mut content = body.as_ref();
-
-    match args.output {
-        Some(ref path) => {
-            let mut file = File::create(path)?;
-            copy(&mut content, &mut file)?;
-            println!("Saved to {}", path);
-        }
-        None => {
-            let mut out = stdout();
-            copy(&mut content, &mut out)?;
-        }
-    }
-
-    Ok(())
+    download(args)
 }
