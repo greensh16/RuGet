@@ -1,38 +1,47 @@
 use clap::Parser;
 use reqwest::blocking::Client;
 use std::fs::File;
-use std::io::copy;
+use std::io::{copy, stdout};
+use std::process::exit;
 
-/// A simple wget-like tool written in Rust
-#[derive(Parser, Debug)]
-#[command(name = "ruget", version="0.1.0", about = "A simple downloader")]
-struct Args {
-    /// URL to fetch
-    url: String,
-
-    /// Output file
-    #[arg(short, long)]
-    output: Option<String>,
-}
+mod cli;
+use cli::Args;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
+    // Create HTTP client
     let client = Client::new();
-    let mut response = client.get(&args.url).send()?;
-    if !response.status().is_success() {
-        eprintln!("Failed to download: {}", response.status());
-        std::process::exit(1);
+    let response = client.get(&args.url).send()?;
+
+    // Print HTTP status
+    let status = response.status();
+    println!("Status: {}", status);
+
+    // Print headers
+    println!("Headers:");
+    for (key, value) in response.headers() {
+        println!("  {}: {}", key, value.to_str().unwrap_or("[binary]"));
     }
 
+    if !status.is_success() {
+        eprintln!("Download failed with status code: {}", status);
+        exit(1);
+    }
+
+    // Write response body
+    let body = response.bytes()?;
+    let mut content = body.as_ref();
+
     match args.output {
-        Some(path) => {
-            let mut dest = File::create(path)?;
-            copy(&mut response, &mut dest)?;
+        Some(ref path) => {
+            let mut file = File::create(path)?;
+            copy(&mut content, &mut file)?;
+            println!("Saved to {}", path);
         }
         None => {
-            let mut stdout = std::io::stdout();
-            copy(&mut response, &mut stdout)?;
+            let mut out = stdout();
+            copy(&mut content, &mut out)?;
         }
     }
 
