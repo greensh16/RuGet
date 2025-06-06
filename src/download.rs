@@ -2,9 +2,11 @@ use crate::cli::Args;
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use rayon::prelude::*;
+use netrc::Netrc;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, Write},
+    io::{Read, Write, BufReader},
     path::{Path, PathBuf},
     thread::sleep,
     time::Duration,
@@ -12,7 +14,7 @@ use std::{
 };
 use reqwest::{
     blocking::Client,
-    header::{HeaderMap, HeaderName, HeaderValue, RANGE},
+    header::{HeaderMap, HeaderName, HeaderValue, RANGE, AUTHORIZATION},
 };
 
 fn build_headers(header_args: &[String]) -> HeaderMap {
@@ -25,6 +27,34 @@ fn build_headers(header_args: &[String]) -> HeaderMap {
         }
     }
     headers
+}
+
+
+fn maybe_add_netrc_auth(headers: &mut HeaderMap, url: &str) {
+    if let Ok(parsed_url) = reqwest::Url::parse(url) {
+        if let Some(host) = parsed_url.host_str() {
+            let home = std::env::var("HOME").unwrap_or_default();
+            let netrc_path = format!("{}/.netrc", home);
+            if let Ok(file) = File::open(netrc_path) {
+                if let Ok(netrc) = Netrc::parse(BufReader::new(file)) {
+                    if let Some((_, machine)) = netrc.hosts.iter().find(|(h, _)| h == host) {
+                        if !machine.login.is_empty() {
+                            if let Some(password) = &machine.password {
+                                if !password.is_empty() {
+                                    let encoded = BASE64_STANDARD.encode(format!(
+                                        "{}:{}",
+                                        machine.login, password
+                                    ));
+                                    let auth = format!("Basic {}", encoded);
+                                    headers.insert(AUTHORIZATION, auth.parse().unwrap());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn extract_filename_from_disposition(header: Option<&HeaderValue>) -> Option<String> {
@@ -47,6 +77,7 @@ fn download_url(
     global_pb: Option<Arc<ProgressBar>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = build_headers(&args.headers);
+    maybe_add_netrc_auth(&mut headers, url);
 
     if let Some(parent) = Path::new(output_path).parent() {
         std::fs::create_dir_all(parent)?;

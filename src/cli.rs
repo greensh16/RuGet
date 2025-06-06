@@ -1,7 +1,7 @@
 use clap::{Parser, ArgAction};
 
 /// A simple wget-like tool written in Rust
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = "ruget", version="0.1.5", about = "A simple downloader")]
 pub struct Args {
     /// One or more URLs to fetch
@@ -46,4 +46,8 @@ pub struct Args {
     /// Path to log file for failed downloads
     #[arg(long, default_value = "rustget_failures.log")]
     pub log: String,
+
+    /// Create a default ~/.rugetrc config template
+    #[arg(long)]
+    pub init: bool,
 }
