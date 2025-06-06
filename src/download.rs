@@ -82,19 +82,30 @@ fn download_url(
         std::fs::create_dir_all(parent)?;
     }
 
-    let mut file = if args.resume && Path::new(output_path).exists() {
-        let existing_len = std::fs::metadata(output_path)?.len();
-        let head_resp = client.head(url).send()?;
-        let remote_len = head_resp.content_length().unwrap_or(0);
+    // Determine resume position
+    let mut append_mode = false;
 
-        if existing_len >= remote_len {
+    let remote_len = client.head(url).send()?.content_length().unwrap_or(0);
+
+    if args.resume && Path::new(output_path).exists() {
+        let downloaded = std::fs::metadata(output_path)?.len();
+
+        if downloaded >= remote_len {
             if !args.quiet {
-                println!("File already complete: {}", output_path);
+                println!("Already downloaded: {}", output_path);
             }
             return Ok(());
         }
 
-        headers.insert(RANGE, format!("bytes={}-", existing_len).parse()?);
+        headers.insert(RANGE, format!("bytes={}-", downloaded).parse()?);
+        append_mode = true;
+
+        if !args.quiet {
+            println!("Resuming {} from byte {}", output_path, downloaded);
+        }
+    }
+
+    let mut file = if append_mode {
         OpenOptions::new().append(true).open(output_path)?
     } else {
         File::create(output_path)?
@@ -108,8 +119,7 @@ fn download_url(
             Ok(mut resp) => {
                 let status = resp.status();
                 if !status.is_success() && status.as_u16() != 206 {
-                    eprintln!("{}: Failed with status {}", url, status);
-                    return Err("HTTP error".into());
+                    return Err(format!("{}: failed with HTTP {}", url, status).into());
                 }
 
                 if !args.quiet {
@@ -132,7 +142,6 @@ fn download_url(
                     pb.inc(n as u64);
                 }
 
-                pb.println("Done");
                 break;
             }
             Err(e) => {
