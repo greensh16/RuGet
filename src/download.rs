@@ -29,7 +29,6 @@ fn build_headers(header_args: &[String]) -> HeaderMap {
     headers
 }
 
-
 fn maybe_add_netrc_auth(headers: &mut HeaderMap, url: &str) {
     if let Ok(parsed_url) = reqwest::Url::parse(url) {
         if let Some(host) = parsed_url.host_str() {
@@ -164,7 +163,6 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         return Err("Cannot use --output with multiple URLs".into());
     }
 
-    // Aggregate content-length
     let total_size: u64 = args
         .urls
         .iter()
@@ -203,12 +201,7 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
             let failures = Arc::clone(&failures);
             let global_pb = global_pb.clone();
 
-            let head_resp = if args.output.is_none() && args.output_dir.is_none() {
-                client.head(&url).send().ok()
-            } else {
-                None
-            };
-
+            let head_resp = client.head(&url).send().ok();
             let suggested_name = head_resp
                 .as_ref()
                 .and_then(|resp| extract_filename_from_disposition(resp.headers().get("content-disposition")));
@@ -232,6 +225,10 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
                 final_name
             };
 
+            if !args.quiet {
+                println!("Saving {} to {}", url, output_path);
+            }
+
             match download_url(&client, &url, &output_path, &args, global_pb) {
                 Ok(_) => Some(url),
                 Err(_) => {
@@ -249,7 +246,7 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let num_success = results.iter().filter(|r| r.is_some()).count();
     let total = results.len();
     if !args.quiet {
-        println!("✅ {}/{} downloads succeeded (initial pass)", num_success, total);
+        println!("{}/{} downloads succeeded (initial pass)", num_success, total);
     }
 
     let failures = Arc::try_unwrap(failures).unwrap().into_inner().unwrap();
@@ -263,12 +260,12 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         match download_url(&client, &url, &output_path, &args, global_pb.clone()) {
             Ok(_) => {
                 if !args.quiet {
-                    println!("✅ Retry succeeded: {}", url);
+                    println!("Retry succeeded: {}", url);
                 }
             }
             Err(e) => {
                 if !args.quiet {
-                    println!("❌ Retry failed: {} ({})", url, e);
+                    println!("Retry failed: {} ({})", url, e);
                 }
                 final_failures.push((url, e.to_string()));
             }
@@ -286,7 +283,7 @@ pub fn download(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         println!(
-            "❌ {} downloads permanently failed. See {} for details.",
+            "{} downloads permanently failed. See {} for details.",
             final_failures.len(),
             args.log
         );

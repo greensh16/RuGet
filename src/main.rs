@@ -88,6 +88,31 @@ log = "/tmp/ruget_failures.log"
             .unwrap_or_else(|| "ruget_failures.log".to_string());
     }
 
+    // Load URLs from --input file if provided
+    if let Some(ref input_path) = args.input {
+        match std::fs::read_to_string(input_path) {
+            Ok(contents) => {
+                let file_urls: Vec<String> = contents
+                    .lines()
+                    .map(str::trim)
+                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                    .map(str::to_string)
+                    .collect();
+
+                args.urls.extend(file_urls);
+            }
+            Err(err) => {
+                eprintln!("Failed to read input file '{}': {}", input_path, err);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if args.urls.is_empty() {
+        eprintln!("No URLs provided via --input or CLI.");
+        std::process::exit(1);
+    }
+
     if let Err(e) = download(args) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
