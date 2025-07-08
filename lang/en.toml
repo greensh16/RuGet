@@ -1,0 +1,115 @@
+# English localization file for RuGet
+# This file provides English language strings for error messages and hints
+# Future versions will support multiple languages by translating these strings
+
+[error_messages]
+# I/O Errors (E1xx)
+E100 = "General I/O error"
+E101 = "File not found"
+E102 = "Permission denied"
+E103 = "Directory creation failed"
+E104 = "File write error"
+E105 = "File read error"
+
+# HTTP Errors (E2xx)
+E200 = "HTTP request failed"
+E201 = "Connection timeout"
+E202 = "HTTP client error"
+E203 = "HTTP server error"
+E204 = "Invalid URL"
+E205 = "SSL/TLS error"
+
+# Configuration Errors (E3xx)
+E300 = "Configuration error"
+E301 = "Config file not found"
+E302 = "Invalid config format"
+E303 = "Missing required config"
+E304 = "Invalid config value"
+
+# Network Errors (E4xx)
+E400 = "Network error"
+E401 = "DNS resolution failed"
+E402 = "Network unreachable"
+E403 = "Connection refused"
+E404 = "Request timeout"
+
+# Internal Errors (E5xx)
+E500 = "Internal error"
+E501 = "Parse error"
+E502 = "Authentication error"
+E503 = "File system error"
+E504 = "Data corruption"
+E505 = "Resource exhausted"
+
+[error_hints]
+# I/O Errors (E1xx)
+E100 = "Check file permissions and disk space"
+E101 = "Verify the file path exists"
+E102 = "Run with appropriate permissions or check file ownership"
+E103 = "Check parent directory permissions and disk space"
+E104 = "Ensure sufficient disk space and write permissions"
+E105 = "Check file exists and has read permissions"
+
+# HTTP Errors (E2xx)
+E200 = "Check URL validity and server status"
+E201 = "Check internet connection or use --timeout option"
+E202 = "Verify URL and request parameters"
+E203 = "Server is experiencing issues, try again later"
+E204 = "Check URL format and protocol"
+E205 = "Check SSL certificate or use --insecure flag"
+
+# Configuration Errors (E3xx)
+E300 = "Check configuration file syntax"
+E301 = "Create config file or specify path with --config"
+E302 = "Validate TOML syntax in config file"
+E303 = "Add required configuration values"
+E304 = "Check config value format and constraints"
+
+# Network Errors (E4xx)
+E400 = "Check internet connection and network settings"
+E401 = "Check DNS settings or use IP address"
+E402 = "Check network connectivity and routing"
+E403 = "Check if service is running and accessible"
+E404 = "Check internet connection or use --max-retries option"
+
+# Internal Errors (E5xx)
+E500 = "Report this issue with debug information"
+E501 = "Check input format and syntax"
+E502 = "Check credentials and authentication method"
+E503 = "Check file system permissions and disk space"
+E504 = "Verify file integrity and re-download if needed"
+E505 = "Free up system resources or increase limits"
+
+[ui_messages]
+# General UI messages
+download_started = "Download started"
+download_complete = "Download complete"
+download_failed = "Download failed"
+retry_attempt = "Retrying after error"
+hint_prefix = "Hint"
+
+# Command line help text
+help_timeout = "Set request timeout in seconds"
+help_max_retries = "Set maximum number of retry attempts"
+help_insecure = "Allow insecure SSL connections"
+help_config = "Path to configuration file"
+help_verbose = "Enable verbose output"
+help_quiet = "Suppress output"
+
+# Status messages
+checking_connection = "Checking connection..."
+resolving_hostname = "Resolving hostname..."
+establishing_connection = "Establishing connection..."
+downloading = "Downloading..."
+verifying = "Verifying download..."
+
+[format_strings]
+# Format strings for error output
+error_with_hint = "{message} Hint: {hint}"
+error_with_code = "Error [{code}] {message}"
+error_with_code_and_hint = "Error [{code}] {message}. Hint: {hint}"
+
+# Progress format strings  
+download_progress = "{percent}% ({downloaded}/{total})"
+speed_format = "{speed}/s"
+eta_format = "ETA: {eta}"

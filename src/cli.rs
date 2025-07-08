@@ -1,4 +1,26 @@
-use clap::{Parser, ArgAction};
+use clap::{Parser, ArgAction, ValueEnum};
+
+/// Log output format options
+#[derive(Clone, Debug, ValueEnum)]
+pub enum LogFormat {
+    /// Human-readable text format
+    Text,
+    /// JSON format
+    Json,
+}
+
+/// Log level options
+#[derive(Clone, Debug, ValueEnum)]
+pub enum LogLevel {
+    /// Debug level (most verbose)
+    Debug,
+    /// Info level
+    Info,
+    /// Warning level
+    Warn,
+    /// Error level (least verbose)
+    Error,
+}
 
 /// A simple wget-like tool written in Rust
 #[derive(Parser, Debug, Clone)]
@@ -23,13 +45,25 @@ pub struct Args {
     #[arg(long)]
     pub resume: bool,
 
-    /// Retry on failure
+    /// Maximum number of retries on failure
     #[arg(long, default_value = "3")]
-    pub retries: u32,
+    pub max_retries: u32,
 
     /// Verbose output
     #[arg(long, action = ArgAction::SetTrue)]
     pub verbose: bool,
+
+    /// Output logs in JSON format
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub log_json: bool,
+
+    /// Log output format (json or text)
+    #[arg(long, value_enum, help = "Log output format")]
+    pub log_format: Option<LogFormat>,
+
+    /// Log level (debug, info, warn, error)
+    #[arg(long, value_enum, help = "Log level")]
+    pub log_level: Option<LogLevel>,
 
     /// Quiet mode
     #[arg(long, action = ArgAction::SetTrue)]
@@ -50,4 +84,12 @@ pub struct Args {
     /// Create a default ~/.rugetrc config template
     #[arg(long)]
     pub init: bool,
+
+    /// Base delay for exponential backoff in milliseconds
+    #[arg(long, default_value = "100")]
+    pub backoff_base_ms: u64,
+
+    /// Maximum delay for exponential backoff in milliseconds
+    #[arg(long, default_value = "60000")]
+    pub backoff_max_ms: u64,
 }

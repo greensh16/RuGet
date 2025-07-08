@@ -4,117 +4,97 @@ use std;
 mod cli;
 mod download;
 mod config;
+mod output;
+mod error;
+mod http;
+mod init;
+mod file_utils;
+mod fast_download;
+mod lazy_config;
+mod minimal_http;
+mod ultra_fast;
+mod native_http;
+mod simd_ops;
+mod ultimate_fast;
+mod multithreaded_download;
+mod retry;
 
 use cli::Args;
 use download::download;
 use config::Config;
+use output::Logger;
+use error::{Result, RuGetError};
+use init::init_config;
+use file_utils::load_urls_from_file;
+use fast_download::{fast_single_download, should_use_fast_path};
+use lazy_config::{apply_config_if_needed, skip_config_for_simple_download};
+use cli::{LogFormat};
 
 fn main() {
+    if let Err(e) = run() {
+        // Create a basic logger for error reporting
+        let logger = Logger::new(false, false);
+        logger.error_from_ruget_error(&e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let raw_args = Args::parse();
-
-    // Handle --init and exit early
+    
+    // Handle --init and exit early (don't create logger yet)
     if raw_args.init {
-        let home = std::env::var("HOME").unwrap_or_default();
-        let path = format!("{}/.rugetrc", home);
-        let content = r#"# ~/.rugetrc
-
-# Default retry count
-retries = 3
-
-# Resume partial downloads if possible
-resume = true
-
-# Suppress output
-quiet = false
-
-# Verbose output (headers, etc)
-verbose = false
-
-# Number of parallel jobs (0 = auto)
-jobs = 0
-
-# Output directory for downloads
-output_dir = "/path/to/save"
-
-# Custom headers to send
-headers = [
-  "User-Agent: RuGet/1.0",
-  "Accept: */*"
-]
-
-# Log file path for failed downloads
-log = "/tmp/ruget_failures.log"
-"#;
-
-        if std::fs::write(&path, content).is_ok() {
-            println!("Wrote template to {}", path);
-        } else {
-            eprintln!("Failed to write to {}", path);
-        }
-
-        std::process::exit(0);
+        let use_json = determine_json_output(&raw_args);
+        let logger = Logger::new_with_json(raw_args.quiet, raw_args.verbose, use_json);
+        return init_config(&logger);
     }
 
-    // Load ~/.rugetrc
-    let config = Config::from_file();
-
-    // Override raw_args with config values if not set
     let mut args = raw_args;
-
-    if args.retries == 0 {
-        args.retries = config.retries.unwrap_or(0) as u32;
-    }
-    if !args.resume {
-        args.resume = config.resume.unwrap_or(false);
-    }
-    if !args.quiet {
-        args.quiet = config.quiet.unwrap_or(false);
-    }
-    if !args.verbose {
-        args.verbose = config.verbose.unwrap_or(false);
-    }
-    if args.jobs == 0 {
-        args.jobs = config.jobs.unwrap_or(0);
-    }
-    if args.output_dir.is_none() {
-        args.output_dir = config.output_dir;
-    }
-    if args.headers.is_empty() {
-        args.headers = config.headers.unwrap_or_default();
-    }
-    if args.log.is_empty() {
-        args.log = config
-            .log
-            .unwrap_or_else(|| "ruget_failures.log".to_string());
+    
+    // Fast path: Skip config loading for simple downloads
+    if !skip_config_for_simple_download(&args) {
+        apply_config_if_needed(&mut args);
     }
 
     // Load URLs from --input file if provided
     if let Some(ref input_path) = args.input {
-        match std::fs::read_to_string(input_path) {
-            Ok(contents) => {
-                let file_urls: Vec<String> = contents
-                    .lines()
-                    .map(str::trim)
-                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                    .map(str::to_string)
-                    .collect();
-
-                args.urls.extend(file_urls);
-            }
-            Err(err) => {
-                eprintln!("Failed to read input file '{}': {}", input_path, err);
-                std::process::exit(1);
-            }
-        }
+        let file_urls = load_urls_from_file(input_path)?;
+        args.urls.extend(file_urls);
     }
 
     if args.urls.is_empty() {
-        eprintln!("No URLs provided via --input or CLI.");
-        std::process::exit(1);
+        eprintln!("Error: No URLs provided via --input or CLI.");
+        return Err(RuGetError::parse("No URLs provided".into()));
     }
 
-    if let Err(e) = download(args) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+    // Try fast path for single file downloads
+    if should_use_fast_path(&args) {
+        let url = &args.urls[0];
+        let output_path = args.output.as_deref().unwrap_or("download.bin");
+        return fast_single_download(url, output_path, args.quiet);
+    }
+
+    // Create the logger with JSON option
+    let use_json = determine_json_output(&args);
+    let logger = Logger::new_with_json(args.quiet, args.verbose, use_json);
+
+    // Fall back to full download functionality
+    download(args, &logger)
+}
+
+/// Determine whether to use JSON output based on configuration
+fn determine_json_output(args: &Args) -> bool {
+    // Priority: CLI flag > log_format config > default false
+    if args.log_json {
+        return true;
+    }
+    
+    if let Some(format) = &args.log_format {
+        match format {
+            LogFormat::Json => true,
+            LogFormat::Text => false,
+        }
+    } else {
+        false
     }
 }
