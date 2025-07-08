@@ -80,6 +80,53 @@ ruget --input urls.txt \
 
 ---
 
+### Error Codes
+
+RuGet uses structured error codes to help diagnose issues:
+
+- **E1xx**: I/O errors (file permissions, disk space)
+- **E2xx**: HTTP errors (network, server responses)
+- **E3xx**: Configuration errors (invalid config values)
+- **E4xx**: Network errors (DNS, connectivity)
+- **E5xx**: Internal errors (parsing, authentication)
+
+For detailed error descriptions and troubleshooting hints, see [`docs/errors.md`](docs/errors.md).
+
+### Example with Retries and Error Handling
+
+```bash
+ruget https://unstable-server.com/large-file.zip \
+      --output downloads/file.zip \
+      --retries 5 \
+      --resume \
+      --log-json \
+      --log error.log
+```
+
+This command will:
+- Retry failed downloads up to 5 times with exponential backoff
+- Resume partial downloads if the file already exists
+- Log structured JSON output for automation parsing
+- Save detailed error information to `error.log`
+
+### JSON Log Output Example
+
+```json
+{
+  "ts": "2023-09-28T12:34:56Z",
+  "level": "ERROR",
+  "code": "E201",
+  "message": "Connection timeout after 3 retries",
+  "context": {
+    "url": "https://unstable-server.com/large-file.zip",
+    "retry_count": "3",
+    "timeout_ms": "30000"
+  }
+}
+```
+
+---
+
 ### Full Flag Reference
 
 | Flag                | Description                                      |
@@ -94,5 +141,6 @@ ruget --input urls.txt \
 | `--verbose`         | Print status + headers                           |
 | `--quiet`           | Silent except errors                             |
 | `--log <file>`      | Log failed downloads (default: `rustget_failures.log`) |
+| `--log-json`        | Output logs in JSON format for automation       |
 
 ---
