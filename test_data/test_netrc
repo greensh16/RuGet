@@ -1,0 +1,7 @@
+machine httpbin.org
+login testuser
+password testpass123
+
+machine secure-site.com
+login myusername
+password mypassword456
