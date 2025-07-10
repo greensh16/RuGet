@@ -220,12 +220,10 @@ async fn test_backoff_validation_with_wiremock() {
         false,                    // No jitter for predictable timing
     );
 
-    let mut attempt_times = Vec::new();
+    let mut backoff_delays = Vec::new();
     let max_attempts = 3;
     
     for attempt in 0..max_attempts {
-        let start_time = Instant::now();
-        
         let client = reqwest::Client::new();
         let response = client.get(&format!("{}/always-fail", server.uri())).send().await;
         
@@ -234,19 +232,33 @@ async fn test_backoff_validation_with_wiremock() {
         assert!(response.unwrap().status().is_server_error());
         
         if attempt < max_attempts - 1 {
-            // Apply backoff delay
+            // Measure just the backoff delay, not the total request time
             let delay = policy.next_delay(attempt);
+            let delay_start = Instant::now();
             tokio::time::sleep(delay).await;
+            let actual_delay = delay_start.elapsed();
             
-            let total_time = start_time.elapsed();
-            attempt_times.push(total_time);
+            backoff_delays.push(actual_delay);
         }
     }
     
     // Validate that delays are increasing (exponential backoff)
-    if attempt_times.len() >= 2 {
-        assert!(attempt_times[1] > attempt_times[0], 
-               "Second attempt should take longer than first: {:?} vs {:?}", 
-               attempt_times[1], attempt_times[0]);
+    // Allow for some timing variance but expect clear exponential growth
+    if backoff_delays.len() >= 2 {
+        let first_delay = backoff_delays[0];
+        let second_delay = backoff_delays[1];
+        
+        // The second delay should be approximately double the first (factor = 2.0)
+        // Allow for timing variance but expect significant increase
+        assert!(second_delay.as_millis() > first_delay.as_millis() * 3 / 2,
+               "Second delay should be significantly longer than first: {:?} vs {:?}", 
+               second_delay, first_delay);
+        
+        // Also verify delays are in expected ranges
+        assert!(first_delay >= Duration::from_millis(40), "First delay too short: {:?}", first_delay);
+        assert!(first_delay <= Duration::from_millis(80), "First delay too long: {:?}", first_delay);
+        
+        assert!(second_delay >= Duration::from_millis(80), "Second delay too short: {:?}", second_delay);
+        assert!(second_delay <= Duration::from_millis(150), "Second delay too long: {:?}", second_delay);
     }
 }
