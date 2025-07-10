@@ -125,6 +125,9 @@ fn test_retry_config_merge() {
         init: false,
         backoff_base_ms: 100, // Should be overridden by config
         backoff_max_ms: 60000, // Should be overridden by config
+        load_cookies: None,
+        save_cookies: None,
+        keep_session_cookies: false,
     };
     
     config.merge_with_args(&mut args);
@@ -163,6 +166,9 @@ fn test_logging_config_merge() {
         init: false,
         backoff_base_ms: 100,
         backoff_max_ms: 60000,
+        load_cookies: None,
+        save_cookies: None,
+        keep_session_cookies: false,
     };
     
     config.merge_with_args(&mut args);
@@ -205,6 +211,9 @@ fn test_cli_precedence_over_config() {
         init: false,
         backoff_base_ms: 200, // Already set, should not be overridden
         backoff_max_ms: 30000, // Already set, should not be overridden
+        load_cookies: None,
+        save_cookies: None,
+        keep_session_cookies: false,
     };
     
     config.merge_with_args(&mut args);
@@ -251,6 +260,9 @@ fn test_config_section_priority() {
         init: false,
         backoff_base_ms: 100, // Use config
         backoff_max_ms: 60000, // Use config
+        load_cookies: None,
+        save_cookies: None,
+        keep_session_cookies: false,
     };
     
     config.merge_with_args(&mut args);
@@ -283,6 +295,9 @@ fn test_apply_config_if_needed_with_logging() {
         init: false,
         backoff_base_ms: 100,
         backoff_max_ms: 60000,
+        load_cookies: None,
+        save_cookies: None,
+        keep_session_cookies: false,
     };
     
     // This will load config from ~/.rugetrc if it exists

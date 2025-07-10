@@ -3,22 +3,20 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    thread::sleep,
-    time::Duration,
+    fs::OpenOptions,
+    io::Write,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use reqwest::{
     blocking::Client,
-    header::{RANGE},
     cookie::Jar,
 };
 use crate::output::Logger;
 use crate::error::{Result, RuGetError, WithContext};
-use crate::http::{build_headers, add_netrc_auth, extract_filename_from_disposition, get_fallback_filename};
+use crate::http::{build_headers, extract_filename_from_disposition, get_fallback_filename};
 use crate::multithreaded_download::{multithreaded_download_url, single_threaded_download};
+use crate::cookie::{load_cookies_from_file, save_cookies_to_file};
 
 #[cfg(feature = "context")]
 use crate::error::AnyhowContextExt;
@@ -27,6 +25,11 @@ use crate::error::AnyhowContextExt;
 
 pub fn download(args: Args, logger: &Logger) -> Result<()> {
     let cookie_jar = Arc::new(Jar::default());
+
+    // Load cookies from file if specified
+    if let Some(cookie_file) = &args.load_cookies {
+        load_cookies_from_file(&cookie_jar, cookie_file, logger)?;
+    }
 
     let client = Client::builder()
         .cookie_provider(cookie_jar.clone())
@@ -170,8 +173,17 @@ pub fn download(args: Args, logger: &Logger) -> Result<()> {
         
         // If all downloads failed, return an error
         if final_failures.len() == total {
+            // Save cookies before returning error
+            if let Some(cookie_file) = &args.save_cookies {
+                save_cookies_to_file(&cookie_jar, cookie_file, args.keep_session_cookies, logger)?;
+            }
             return Err(RuGetError::network("All downloads failed after retries".into()));
         }
+    }
+
+    // Save cookies to file if specified
+    if let Some(cookie_file) = &args.save_cookies {
+        save_cookies_to_file(&cookie_jar, cookie_file, args.keep_session_cookies, logger)?;
     }
 
     Ok(())

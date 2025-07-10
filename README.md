@@ -3,7 +3,7 @@
 ![workflow](https://github.com/greensh16/RuGet/actions/workflows/rust_build.yml/badge.svg)
 ![workflow](https://github.com/greensh16/RuGet/actions/workflows/rust-clippy.yml/badge.svg)
 
-RuGet is a `wget`/`curl`-like tool written in Rust. It supports parallel downloads, resuming, retries, progress bars, content-disposition filenames, and logging.
+RuGet is a `wget`/`curl`-like tool written in Rust. It supports parallel downloads, resuming, retries, progress bars, content-disposition filenames, cookie management, and logging.
 
 ---
 
@@ -63,6 +63,39 @@ ruget --input urls.txt --output-dir downloads --resume --retries 5
 
 ---
 
+### Cookie Management
+
+RuGet supports wget-compatible cookie handling for session management:
+
+#### Load cookies from a file
+```bash
+ruget --load-cookies session.txt https://example.com/protected-resource
+```
+
+#### Save cookies to maintain sessions
+```bash
+ruget --save-cookies session.txt https://example.com/login
+```
+
+#### Load and save cookies (session persistence)
+```bash
+ruget --load-cookies session.txt --save-cookies session.txt https://example.com/dashboard
+```
+
+#### Include session cookies when saving
+```bash
+ruget --load-cookies session.txt --save-cookies session.txt --keep-session-cookies https://example.com/api
+```
+
+**Cookie File Format**: Uses standard Netscape HTTP Cookie File format, compatible with wget and curl:
+```
+# Netscape HTTP Cookie File
+example.com	TRUE	/	FALSE	0	session_id	abc123
+github.com	TRUE	/	TRUE	1735200000	auth_token	def456
+```
+
+---
+
 ### Progress, Logging, and Control
 
 ```bash
@@ -109,6 +142,29 @@ This command will:
 - Log structured JSON output for automation parsing
 - Save detailed error information to `error.log`
 
+### Complete Example with Session Management
+
+```bash
+# Login and save session cookies
+ruget --save-cookies session.txt https://secure-site.com/login
+
+# Use saved cookies to access protected resources
+ruget --load-cookies session.txt \
+      --save-cookies session.txt \
+      --keep-session-cookies \
+      --output-dir downloads \
+      --retries 3 \
+      --verbose \
+      https://secure-site.com/protected/file1.zip \
+      https://secure-site.com/protected/file2.zip
+```
+
+This example demonstrates:
+- Session cookie persistence across multiple requests
+- Authenticated downloads with retry capability
+- Multiple file downloads with session maintenance
+- Verbose logging for monitoring progress
+
 ### JSON Log Output Example
 
 ```json
@@ -142,5 +198,37 @@ This command will:
 | `--quiet`           | Silent except errors                             |
 | `--log <file>`      | Log failed downloads (default: `rustget_failures.log`) |
 | `--log-json`        | Output logs in JSON format for automation       |
+| `--load-cookies <file>` | Load cookies from Netscape-style cookie file |
+| `--save-cookies <file>` | Save cookies to file after downloads         |
+| `--keep-session-cookies` | Include session cookies when saving         |
+
+---
+
+### Wget Compatibility
+
+RuGet is designed to be a drop-in replacement for common wget usage patterns:
+
+**wget command:**
+```bash
+wget --load-cookies ~/.session_cookies \
+     --save-cookies ~/.session_cookies \
+     --keep-session-cookies \
+     --output-document=file.html \
+     "https://example.com/protected"
+```
+
+**equivalent ruget command:**
+```bash
+ruget --load-cookies ~/.session_cookies \
+      --save-cookies ~/.session_cookies \
+      --keep-session-cookies \
+      --output file.html \
+      "https://example.com/protected"
+```
+
+- Cookie files are fully compatible between wget and ruget
+- Supports the same Netscape HTTP Cookie File format
+- Session management works identically
+- Easy migration from existing wget scripts
 
 ---

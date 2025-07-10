@@ -18,6 +18,7 @@ mod simd_ops;
 mod ultimate_fast;
 mod multithreaded_download;
 mod retry;
+mod cookie;
 
 use cli::Args;
 use download::download;

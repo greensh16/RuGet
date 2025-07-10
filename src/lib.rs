@@ -15,6 +15,7 @@ pub mod simd_ops;
 pub mod ultimate_fast;
 pub mod multithreaded_download;
 pub mod retry;
+pub mod cookie;
 
 // Re-export commonly used types for convenience
 pub use cli::Args;

@@ -1,0 +1,6 @@
+# Netscape HTTP Cookie File
+# This is a test cookie file for RuGet
+#
+example.com	TRUE	/	FALSE	0	session_id	test123456
+httpbin.org	TRUE	/	FALSE	1735200000	test_cookie	value123
+github.com	TRUE	/	TRUE	1735200000	auth_token	abc789def

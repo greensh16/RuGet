@@ -114,6 +114,9 @@ mod tests {
             init: false,
             backoff_base_ms: 100,
             backoff_max_ms: 60000,
+            load_cookies: None,
+            save_cookies: None,
+            keep_session_cookies: false,
         };
         
         assert!(should_use_fast_path(&args));

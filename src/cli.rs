@@ -92,4 +92,16 @@ pub struct Args {
     /// Maximum delay for exponential backoff in milliseconds
     #[arg(long, default_value = "60000")]
     pub backoff_max_ms: u64,
+
+    /// Load cookies from file
+    #[arg(long)]
+    pub load_cookies: Option<String>,
+
+    /// Save cookies to file
+    #[arg(long)]
+    pub save_cookies: Option<String>,
+
+    /// Keep session cookies when saving
+    #[arg(long)]
+    pub keep_session_cookies: bool,
 }
