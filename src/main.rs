@@ -51,7 +51,20 @@ fn run() -> Result<()> {
 
     let mut args = raw_args;
     
-    // Fast path: Skip config loading for simple downloads
+    // Check for fast path BEFORE config loading to avoid config interference
+    let can_use_fast_path = should_use_fast_path(&args);
+    
+    if can_use_fast_path {
+        // Fast path: minimal single URL download
+        let url = &args.urls[0];
+        if let Some(output_path) = args.output.as_deref() {
+            return fast_single_download(url, Some(output_path), args.quiet);
+        } else {
+            return fast_single_download(url, None, args.quiet);
+        }
+    }
+    
+    // Regular path: apply config and continue
     if !skip_config_for_simple_download(&args) {
         apply_config_if_needed(&mut args);
     }
@@ -65,13 +78,6 @@ fn run() -> Result<()> {
     if args.urls.is_empty() {
         eprintln!("Error: No URLs provided via --input or CLI.");
         return Err(RuGetError::parse("No URLs provided".into()));
-    }
-
-    // Try fast path for single file downloads
-    if should_use_fast_path(&args) {
-        let url = &args.urls[0];
-        let output_path = args.output.as_deref().unwrap_or("download.bin");
-        return fast_single_download(url, output_path, args.quiet);
     }
 
     // Create the logger with JSON option

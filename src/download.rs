@@ -167,6 +167,11 @@ pub fn download(args: Args, logger: &Logger) -> Result<()> {
             final_failures.len(),
             args.log
         ));
+        
+        // If all downloads failed, return an error
+        if final_failures.len() == total {
+            return Err(RuGetError::network("All downloads failed after retries".into()));
+        }
     }
 
     Ok(())

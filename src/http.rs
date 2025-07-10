@@ -86,11 +86,29 @@ pub fn extract_filename_from_disposition(header: Option<&HeaderValue>) -> Option
 
 /// Get fallback filename from URL
 pub fn get_fallback_filename(url: &str) -> String {
-    url.split('/')
+    let last_segment = url.split('/')
         .last()
         .filter(|s| !s.is_empty())
-        .unwrap_or("download.bin")
-        .to_string()
+        .unwrap_or("download.bin");
+    
+    // If the last segment contains a dot, check if it's a filename or domain
+    if last_segment.contains('.') {
+        // Check if it's likely a filename by looking at the extension
+        if let Some(dot_pos) = last_segment.rfind('.') {
+            let extension = &last_segment[dot_pos + 1..];
+            // If the extension is 1-5 chars and alphanumeric, it's likely a file extension
+            if extension.len() >= 1 && extension.len() <= 5 && extension.chars().all(|c| c.is_alphanumeric()) {
+                // Additional check: make sure it's not a domain extension
+                let common_domains = ["com", "org", "net", "edu", "gov", "mil", "int", "co", "uk", "ca", "au", "de", "fr", "jp", "cn", "ru", "br", "in", "it", "es", "nl", "se", "no", "fi", "dk", "pl", "be", "ch", "at", "cz", "hu", "ie", "pt", "gr", "bg", "ro", "hr", "si", "sk", "lt", "lv", "ee", "is", "mt", "cy", "lu", "mc", "li", "ad", "sm", "va", "tv", "cc", "tk", "ml", "ga", "cf", "biz", "info", "name", "pro", "aero", "coop", "museum"];
+                if !common_domains.contains(&extension) {
+                    return last_segment.to_string();
+                }
+            }
+        }
+    }
+    
+    // If it's not a filename, use default
+    "download.bin".to_string()
 }
 
 #[cfg(test)]

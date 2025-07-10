@@ -6,44 +6,52 @@ use std::path::Path;
 
 /// Ultra-fast download for single files using minimal dependencies
 /// This bypasses most of the heavy infrastructure for simple downloads
-pub fn fast_single_download(url: &str, output_path: &str, quiet: bool) -> Result<()> {
-    // Try ultimate mode first (native HTTP + SIMD + caching)
-    if crate::ultimate_fast::should_use_ultimate_mode(url, output_path) {
-        crate::ultimate_fast::ultimate_download(url, output_path)?;
-        if !quiet {
-            println!("Downloaded {} to {}", url, output_path);
-        }
-        return Ok(());
-    }
-    
-    // Fall back to ultra-fast mode
-    if crate::ultra_fast::can_use_ultra_fast(url, output_path) {
-        crate::ultra_fast::ultra_fast_download(url, output_path)?;
-        if !quiet {
-            println!("Downloaded {} to {}", url, output_path);
-        }
-        return Ok(());
-    }
-    
+pub fn fast_single_download(url: &str, output_path: Option<&str>, quiet: bool) -> Result<()> {
     // Check if we can use the fast path
     if !is_simple_http_url(url) {
         return Err(RuGetError::network("Fast path only supports simple HTTP/HTTPS URLs".into()));
     }
 
-    // Create output directory if needed
-    if let Some(parent) = Path::new(output_path).parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+    match output_path {
+        Some(path) => {
+            // Try ultimate mode first (native HTTP + SIMD + caching) for file output
+            if crate::ultimate_fast::should_use_ultimate_mode(url, path) {
+                crate::ultimate_fast::ultimate_download(url, path)?;
+                if !quiet {
+                    println!("Downloaded {} to {}", url, path);
+                }
+                return Ok(());
+            }
+            
+            // Fall back to ultra-fast mode for file output
+            if crate::ultra_fast::can_use_ultra_fast(url, path) {
+                crate::ultra_fast::ultra_fast_download(url, path)?;
+                if !quiet {
+                    println!("Downloaded {} to {}", url, path);
+                }
+                return Ok(());
+            }
+            
+            // Create output directory if needed
+            if let Some(parent) = Path::new(path).parent() {
+                std::fs::create_dir_all(parent)?;
+            }
 
-    // Use a minimal HTTP client
-    let response = simple_http_get(url)?;
-    
-    // Write directly to file with minimal buffering
-    let mut file = File::create(output_path)?;
-    file.write_all(&response)?;
-    
-    if !quiet {
-        println!("Downloaded {} to {}", url, output_path);
+            // Use a minimal HTTP client and write to file
+            let response = simple_http_get(url)?;
+            let mut file = File::create(path)?;
+            file.write_all(&response)?;
+            
+            if !quiet {
+                println!("Downloaded {} to {}", url, path);
+            }
+        }
+        None => {
+            // Output to stdout - use minimal HTTP client
+            let response = simple_http_get(url)?;
+            io::stdout().write_all(&response)?;
+            io::stdout().flush()?;
+        }
     }
     
     Ok(())
@@ -72,7 +80,6 @@ pub fn should_use_fast_path(args: &Args) -> bool {
         && !args.verbose
         && args.headers.is_empty()
         && args.jobs <= 1
-        && args.max_retries <= 1
 }
 
 #[cfg(test)]

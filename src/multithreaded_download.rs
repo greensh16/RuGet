@@ -67,10 +67,19 @@ pub fn download_chunk(
             Ok(mut resp) => {
                 let status = resp.status();
                 if !status.is_success() && status.as_u16() != 206 {
-                    return Err(RuGetError::network(format!(
-                        "{}: chunk {} failed with HTTP {}", 
-                        url, chunk.chunk_id, status
-                    )));
+                    // Treat HTTP status errors as retryable
+                    attempt += 1;
+                    if attempt > args.max_retries {
+                        return Err(RuGetError::network(format!(
+                            "{}: chunk {} failed with HTTP {} after {} retries", 
+                            url, chunk.chunk_id, status, args.max_retries
+                        )));
+                    }
+                    
+                    logger.retry_attempt(url, &format!("chunk {} HTTP {}", chunk.chunk_id, status));
+                    let delay = backoff_policy.next_delay(attempt - 1);
+                    thread::sleep(delay);
+                    continue;
                 }
 
                 // Create a temporary file for this chunk
@@ -283,10 +292,24 @@ pub fn single_threaded_download(
             .with_context(|| format!("reading metadata for resume file {}", output_path))?
             .len();
 
-        let remote_len = client.head(url).send()
-            .with_context(|| format!("fetching remote file length for {}", url))?
-            .content_length().unwrap_or(0);
-
+        let head_response = client.head(url).send()
+            .with_context(|| format!("fetching remote file length for {}", url))?;
+        
+        // Try both content_length() method and manual header parsing as fallback
+        let auto_len = head_response.content_length();
+        let manual_len = head_response.headers()
+            .get("content-length")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok());
+        
+        // Prefer manual parsing if auto returns 0, otherwise use auto if available
+        let remote_len = if auto_len == Some(0) && manual_len.is_some() {
+            manual_len.unwrap()
+        } else {
+            auto_len.or(manual_len).unwrap_or(0)
+        };
+        
+        
         if downloaded >= remote_len {
             logger.info(&format!("File {} already fully downloaded", output_path));
             return Ok(());
@@ -323,7 +346,18 @@ pub fn single_threaded_download(
             Ok(mut resp) => {
                 let status = resp.status();
                 if !status.is_success() && status.as_u16() != 206 {
-                    return Err(RuGetError::network(format!("{}: failed with HTTP {}", url, status)));
+                    // Treat HTTP status errors as retryable
+                    attempt += 1;
+                    if attempt > args.max_retries {
+                        return Err(RuGetError::network(format!(
+                            "{}: failed with HTTP {} after {} retries", url, status, args.max_retries
+                        )));
+                    }
+                    
+                    logger.retry_attempt(url, &format!("HTTP {}", status));
+                    let delay = backoff_policy.next_delay(attempt - 1);
+                    thread::sleep(delay);
+                    continue;
                 }
 
                 logger.status(url, &status.to_string());
