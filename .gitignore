@@ -16,5 +16,8 @@ cargo.lock
 
 # VS Code
 .vscode/
+.DS_Store
 
-
+notes/
+feature_test_results/
+urls.txt

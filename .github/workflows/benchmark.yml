@@ -1,0 +1,95 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      benchmark_type:
+        description: 'Type of benchmark to run'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - memory
+          - simple
+          - comprehensive
+          - tri_benchmark
+      iterations:
+        description: 'Number of iterations (for applicable benchmarks)'
+        required: false
+        default: '5'
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl wget time bc
+    
+    - name: Build RuGet in release mode
+      run: cargo build --release
+    
+    - name: Make benchmark scripts executable
+      run: |
+        chmod +x quick_test.sh
+        chmod +x memory_test.sh
+        chmod +x simple_benchmark.sh
+        chmod +x benchmark.sh
+        chmod +x tri_benchmark.sh
+    
+    - name: Run Quick Test
+      if: ${{ github.event.inputs.benchmark_type == 'quick' }}
+      run: ./quick_test.sh
+    
+    - name: Run Memory Test
+      if: ${{ github.event.inputs.benchmark_type == 'memory' }}
+      run: ./memory_test.sh
+    
+    - name: Run Simple Benchmark
+      if: ${{ github.event.inputs.benchmark_type == 'simple' }}
+      run: ./simple_benchmark.sh
+    
+    - name: Run Comprehensive Benchmark
+      if: ${{ github.event.inputs.benchmark_type == 'comprehensive' }}
+      run: ./benchmark.sh
+    
+    - name: Run Three-way Benchmark
+      if: ${{ github.event.inputs.benchmark_type == 'tri_benchmark' }}
+      run: ./tri_benchmark.sh
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results-${{ github.event.inputs.benchmark_type }}-${{ github.run_number }}
+        path: |
+          benchmark_results/
+          *.csv
+          *.txt
+          *.md
+        retention-days: 30
+        if-no-files-found: ignore
+    
+    - name: Summary
+      run: |
+        echo "## Benchmark Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Benchmark Type**: ${{ github.event.inputs.benchmark_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run ID**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp**: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Results have been uploaded as artifacts and can be downloaded from the workflow run page." >> $GITHUB_STEP_SUMMARY
